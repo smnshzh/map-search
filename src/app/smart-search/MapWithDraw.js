@@ -56,7 +56,7 @@ export default function MapWithDraw({ onPolygonChange, polygon = null }) {
         <EditControl
           position="topleft"
           draw={{
-            rectangle: false,
+            rectangle: true,
             circle: false,
             marker: false,
             polyline: false,

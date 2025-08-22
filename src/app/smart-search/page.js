@@ -156,7 +156,6 @@ export default function SmartSearchPage() {
       try {
         const params = new URLSearchParams({
           slug: selected,
-          polygon: polygon.map(([lng, lat]) => `${lng},${lat}`).join("|"),
           zoom: "14",
           camera: `${lng},${lat}`,
         });
@@ -251,7 +250,42 @@ export default function SmartSearchPage() {
   });
   // صفحه‌بندی
   const pageCount = Math.ceil(filteredResults.length / rowsPerPage) || 1;
-  const pagedResults = filteredResults.slice((page - 1) * rowsPerPage, page * rowsPerPage);
+  // سورت جدول نتایج
+  const [sortField, setSortField] = useState("#");
+  const [sortDir, setSortDir] = useState("asc"); // asc | desc
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortDir(sortDir === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDir("asc");
+    }
+  };
+  // تابع مرتب‌سازی داده‌ها
+  const sortedResults = [...filteredResults].sort((a, b) => {
+    const getVal = (row, field) => {
+      const props = row.properties || {};
+      const token = props.token;
+      const detail = token ? poiDetails[token] : null;
+      const geom = row.geometry || {};
+      const coords = geom.coordinates || [];
+      switch (field) {
+        case "نام": return (detail?.name || props.name || "").toLowerCase();
+        case "امتیاز": return props.rate ?? 0;
+        case "دسته‌بندی": return (detail?.category || props.category || "").toLowerCase();
+        case "poitoken": return token || "";
+        default: return 0;
+      }
+    };
+    const vA = getVal(a, sortField);
+    const vB = getVal(b, sortField);
+    if (vA < vB) return sortDir === "asc" ? -1 : 1;
+    if (vA > vB) return sortDir === "asc" ? 1 : -1;
+    return 0;
+  });
+  // صفحه‌بندی روی داده مرتب‌شده
+  const pagedResults = sortedResults.slice((page - 1) * rowsPerPage, page * rowsPerPage);
+
   // اگر فیلتر تغییر کرد، صفحه به ۱ برگردد
   useEffect(() => { setPage(1); }, [filterName, filterCategory, results]);
 
@@ -307,9 +341,14 @@ export default function SmartSearchPage() {
   };
   // انتقال داده به دیتابیس (Supabase یا mock)
   const handleTransferToDb = async () => {
+    if (loadingPoiDetails) {
+      setDbStatusMsg("لطفاً تا پایان دریافت اطلاعات POI صبر کنید.");
+      setDbLoading(false);
+      return;
+    }
     setDbLoading(true);
     setDbTransferErrors([]);
-    // فقط ردیف‌هایی که آدرس دارند
+    // استفاده از آخرین state برای poiDetails و poiTokens
     const validRows = filteredResults.map((feature, idx) => {
       const globalIdx = (page - 1) * rowsPerPage + idx;
       const token = poiTokens[globalIdx] || null;
@@ -317,7 +356,11 @@ export default function SmartSearchPage() {
       const geom = feature.geometry || {};
       const coords = geom.coordinates || [];
       const detail = token ? poiDetails[token] : null;
-      const address = detail?.fields?.find(f => f.icon === "gps")?.value || detail?.address || detail?.location || "";
+      // بررسی همه حالت‌های آدرس و trim
+      const address =
+        (detail?.fields?.find(f => f.icon === "gps")?.value?.trim() || "") ||
+        (detail?.address?.trim() || "") ||
+        (detail?.location?.trim() || "");
       return {
         token,
         name: detail?.name || props.name || "نامشخص",
@@ -420,6 +463,25 @@ export default function SmartSearchPage() {
     }
     setCreatingTable(false);
   };
+
+  // سورت جدول داده‌های ذخیره‌شده
+  const [dbSortField, setDbSortField] = useState("poitoken");
+  const [dbSortDir, setDbSortDir] = useState("asc");
+  const handleDbSort = (field) => {
+    if (dbSortField === field) {
+      setDbSortDir(dbSortDir === "asc" ? "desc" : "asc");
+    } else {
+      setDbSortField(field);
+      setDbSortDir("asc");
+    }
+  };
+  const sortedDbData = [...dbData].sort((a, b) => {
+    const vA = (a[dbSortField] || "").toString().toLowerCase();
+    const vB = (b[dbSortField] || "").toString().toLowerCase();
+    if (vA < vB) return dbSortDir === "asc" ? -1 : 1;
+    if (vA > vB) return dbSortDir === "asc" ? 1 : -1;
+    return 0;
+  });
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-0 sm:p-8">
@@ -594,14 +656,14 @@ export default function SmartSearchPage() {
                 <table className="min-w-full border text-sm rounded-xl overflow-hidden shadow-xl">
                   <thead>
                     <tr className="bg-indigo-100 dark:bg-indigo-800 text-indigo-900 dark:text-indigo-100">
-                      <th className="border px-2 py-1">#</th>
-                      <th className="border px-2 py-1">نام</th>
-                      <th className="border px-2 py-1">امتیاز</th>
+                      <th className="border px-2 py-1 cursor-pointer" onClick={() => handleSort("#")}>#</th>
+                      <th className="border px-2 py-1 cursor-pointer" onClick={() => handleSort("نام")}>نام {sortField==="نام" && (sortDir==="asc"?"▲":"▼")}</th>
+                      <th className="border px-2 py-1 cursor-pointer" onClick={() => handleSort("امتیاز")}>امتیاز {sortField==="امتیاز" && (sortDir==="asc"?"▲":"▼")}</th>
                       <th className="border px-2 py-1">آدرس</th>
                       <th className="border px-2 py-1">تلفن</th>
-                      <th className="border px-2 py-1">دسته‌بندی</th>
+                      <th className="border px-2 py-1 cursor-pointer" onClick={() => handleSort("دسته‌بندی")}>دسته‌بندی {sortField==="دسته‌بندی" && (sortDir==="asc"?"▲":"▼")}</th>
                       <th className="border px-2 py-1">مختصات</th>
-                      <th className="border px-2 py-1">poitoken</th>
+                      <th className="border px-2 py-1 cursor-pointer" onClick={() => handleSort("poitoken")}>poitoken {sortField==="poitoken" && (sortDir==="asc"?"▲":"▼")}</th>
                       <th className="border px-2 py-1">وضعیت POI</th>
                     </tr>
                   </thead>
@@ -781,16 +843,16 @@ export default function SmartSearchPage() {
               <table className="min-w-full border text-sm rounded-xl overflow-hidden shadow-xl">
                 <thead>
                   <tr className="bg-indigo-100 dark:bg-indigo-800 text-indigo-900 dark:text-indigo-100">
-                    <th className="border px-2 py-1">poitoken</th>
-                    <th className="border px-2 py-1">نام</th>
-                    <th className="border px-2 py-1">آدرس</th>
-                    <th className="border px-2 py-1">امتیاز</th>
-                    <th className="border px-2 py-1">دسته‌بندی</th>
-                    <th className="border px-2 py-1">مختصات</th>
+                    <th className="border px-2 py-1 cursor-pointer" onClick={() => handleDbSort("poitoken")}>poitoken {dbSortField==="poitoken" && (dbSortDir==="asc"?"▲":"▼")}</th>
+                    <th className="border px-2 py-1 cursor-pointer" onClick={() => handleDbSort("name")}>نام {dbSortField==="name" && (dbSortDir==="asc"?"▲":"▼")}</th>
+                    <th className="border px-2 py-1 cursor-pointer" onClick={() => handleDbSort("address")}>آدرس {dbSortField==="address" && (dbSortDir==="asc"?"▲":"▼")}</th>
+                    <th className="border px-2 py-1 cursor-pointer" onClick={() => handleDbSort("rate")}>امتیاز {dbSortField==="rate" && (dbSortDir==="asc"?"▲":"▼")}</th>
+                    <th className="border px-2 py-1 cursor-pointer" onClick={() => handleDbSort("category")}>دسته‌بندی {dbSortField==="category" && (dbSortDir==="asc"?"▲":"▼")}</th>
+                    <th className="border px-2 py-1 cursor-pointer" onClick={() => handleDbSort("coords")}>مختصات {dbSortField==="coords" && (dbSortDir==="asc"?"▲":"▼")}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {dbData.map((row, idx) => (
+                  {sortedDbData.map((row, idx) => (
                     <tr key={idx} className="odd:bg-white even:bg-indigo-50 dark:odd:bg-gray-900 dark:even:bg-indigo-900/40">
                       <td className="border px-2 py-1 font-mono text-xs">{row.token}</td>
                       <td className="border px-2 py-1">{row.name}</td>
