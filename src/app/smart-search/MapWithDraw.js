@@ -5,7 +5,7 @@ import { FeatureGroup } from "react-leaflet";
 import { EditControl } from "react-leaflet-draw";
 import "leaflet/dist/leaflet.css";
 
-export default function MapWithDraw({ onPolygonChange }) {
+export default function MapWithDraw({ onPolygonChange, polygon = null }) {
   const [mounted, setMounted] = useState(false);
   const featureGroupRef = useRef();
 
@@ -17,7 +17,8 @@ export default function MapWithDraw({ onPolygonChange }) {
       });
     }
   }, []);
-  if (!mounted) return null;
+
+  if (!mounted || typeof window === "undefined") return null;
 
   const handleCreated = (e) => {
     if (e.layerType === "polygon") {
@@ -41,7 +42,12 @@ export default function MapWithDraw({ onPolygonChange }) {
   };
 
   return (
-    <MapContainer center={[35.715298, 51.42151]} zoom={12} style={{ height: "100%", width: "100%" }}>
+    <MapContainer
+      key="map"
+      center={[35.715298, 51.42151]}
+      zoom={12}
+      style={{ height: "100%", width: "100%" }}
+    >
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

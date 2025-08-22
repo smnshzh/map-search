@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import CategoryCombobox from "./CategoryCombobox";
+import { createClient } from '@supabase/supabase-js';
 
 // تابع تولید نقاط روی محیط و داخل Polygon
 function generateCamerasOnPerimeter(coords, step = 0.0002, internalSpacing = 0.001) {
@@ -46,6 +47,11 @@ function generateCamerasOnPerimeter(coords, step = 0.0002, internalSpacing = 0.0
   return points;
 }
 
+// تابع sleep
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 const MapWithDraw = dynamic(() => import("./MapWithDraw"), { ssr: false });
 const ResultMap = dynamic(() => import("./ResultMap"), { ssr: false });
 
@@ -73,7 +79,28 @@ export default function SmartSearchPage() {
   const rowsPerPage = 15;
   const [poiTokens, setPoiTokens] = useState([]);
   const [retryingToken, setRetryingToken] = useState(null);
+  const [dbType, setDbType] = useState("sqlite");
+  const [dbConn, setDbConn] = useState("");
+  const [dbData, setDbData] = useState([]);
+  const [dbLoading, setDbLoading] = useState(false);
+  const [dbStatus, setDbStatus] = useState("disconnected"); // 'disconnected' | 'connecting' | 'connected' | 'error'
+  const [dbStatusMsg, setDbStatusMsg] = useState("");
+  const [supabaseUrl, setSupabaseUrl] = useState("");
+  const [supabaseKey, setSupabaseKey] = useState("");
+  const [supabase, setSupabase] = useState(null);
+  const [showCreateTable, setShowCreateTable] = useState(false);
+  const [creatingTable, setCreatingTable] = useState(false);
+  const [serviceRoleKey, setServiceRoleKey] = useState("");
+  const createTableSQL = `create table if not exists poi_details (
+  token text primary key,
+  name text,
+  address text,
+  category text,
+  rate float,
+  coords text
+);`;
   // حذف categorySearch و filteredCategories
+  const [dbTransferErrors, setDbTransferErrors] = useState([]);
 
   useEffect(() => {
     async function fetchCategories() {
@@ -178,6 +205,7 @@ export default function SmartSearchPage() {
               break;
             } else {
               lastError = `HTTP ${res.status}`;
+              if (res.status === 429) await sleep(5000);
             }
           } catch (err) {
             lastError = err.message;
@@ -248,6 +276,7 @@ export default function SmartSearchPage() {
           break;
         } else {
           lastError = `HTTP ${res.status}`;
+          if (res.status === 429) await sleep(5000);
         }
       } catch (err) {
         lastError = err.message;
@@ -262,6 +291,134 @@ export default function SmartSearchPage() {
       delete copy[token];
       return copy;
     });
+  };
+
+  // دکمه فراخوانی مجدد همه
+  const retryAllFailed = async () => {
+    const failedTokens = pagedResults
+      .map((feature, idx) => {
+        const globalIdx = (page - 1) * rowsPerPage + idx;
+        return poiTokens[globalIdx] || null;
+      })
+      .filter(token => token && poiDetailErrors[token]);
+    for (const token of failedTokens) {
+      await retryFetchPoiDetail(token);
+    }
+  };
+  // انتقال داده به دیتابیس (Supabase یا mock)
+  const handleTransferToDb = async () => {
+    setDbLoading(true);
+    setDbTransferErrors([]);
+    // فقط ردیف‌هایی که آدرس دارند
+    const validRows = filteredResults.map((feature, idx) => {
+      const globalIdx = (page - 1) * rowsPerPage + idx;
+      const token = poiTokens[globalIdx] || null;
+      const props = feature.properties || {};
+      const geom = feature.geometry || {};
+      const coords = geom.coordinates || [];
+      const detail = token ? poiDetails[token] : null;
+      const address = detail?.fields?.find(f => f.icon === "gps")?.value || detail?.address || detail?.location || "";
+      return {
+        token,
+        name: detail?.name || props.name || "نامشخص",
+        address,
+        rate: props.rate ?? "ندارد",
+        category: detail?.category || props.category || "-",
+        coords: coords.length === 2 ? `[${coords[1].toFixed(5)}, ${coords[0].toFixed(5)}]` : "-"
+      };
+    });
+    const rowsWithAddress = validRows.filter(row => row.address && row.address !== "-");
+    const rowsWithoutAddress = validRows.filter(row => !row.address || row.address === "-");
+    // انتقال به دیتابیس (Supabase یا mock)
+    if (dbType === "supabase" && supabase) {
+      try {
+        const { error } = await supabase.from('poi_details').upsert(rowsWithAddress, { onConflict: 'token' });
+        if (error) {
+          setDbStatus("error");
+          setDbStatusMsg("خطا در انتقال داده به Supabase: " + error.message);
+        } else {
+          setDbStatusMsg("انتقال داده‌های دارای آدرس با موفقیت انجام شد!");
+        }
+      } catch (err) {
+        setDbStatus("error");
+        setDbStatusMsg("خطا در انتقال داده: " + err.message);
+      }
+    } else {
+      // mock: فقط نمایش داده‌های ذخیره شده
+      setDbData(rowsWithAddress);
+    }
+    setDbTransferErrors(rowsWithoutAddress);
+    setDbLoading(false);
+  };
+
+  // تابع تست اتصال دیتابیس (mock)
+  const handleTestDbConnection = async () => {
+    setDbStatus("connecting");
+    setDbStatusMsg("");
+    // شبیه‌سازی تست اتصال
+    setTimeout(() => {
+      if (dbConn.trim() !== "") {
+        setDbStatus("connected");
+        setDbStatusMsg("اتصال موفق به دیتابیس!");
+      } else {
+        setDbStatus("error");
+        setDbStatusMsg("اتصال برقرار نشد. لطفاً اطلاعات اتصال را بررسی کنید.");
+      }
+    }, 1000);
+  };
+
+  // تابع تست اتصال واقعی به Supabase
+  const handleTestSupabaseConnection = async () => {
+    setDbStatus("connecting");
+    setDbStatusMsg("");
+    setShowCreateTable(false);
+    try {
+      if (!supabaseUrl.trim() || !supabaseKey.trim()) {
+        setDbStatus("error");
+        setDbStatusMsg("لطفاً هر دو مقدار Supabase URL و Key را وارد کنید.");
+        return;
+      }
+      const client = createClient(supabaseUrl, supabaseKey);
+      setSupabase(client);
+      const { error } = await client.from('poi_details').select('*').limit(1);
+      if (error && error.message.includes('Could not find the table')) {
+        setDbStatus("error");
+        setDbStatusMsg("جدول poi_details وجود ندارد. لطفاً جدول را بسازید.");
+        setShowCreateTable(true);
+      } else if (error) {
+        setDbStatus("error");
+        setDbStatusMsg("اتصال برقرار نشد: " + error.message);
+      } else {
+        setDbStatus("connected");
+        setDbStatusMsg("اتصال موفق به Supabase!");
+      }
+    } catch (err) {
+      setDbStatus("error");
+      setDbStatusMsg("خطا: " + err.message);
+    }
+  };
+
+  // تابع ساخت جدول در Supabase
+  const handleCreateTable = async () => {
+    if (!supabaseUrl || !serviceRoleKey) return;
+    setCreatingTable(true);
+    try {
+      const adminClient = createClient(supabaseUrl, serviceRoleKey);
+      const res = await adminClient.rpc('execute_sql', { sql: createTableSQL });
+      // اگر تابع execute_sql فعال نبود، به کاربر پیام بده
+      if (res.error) {
+        setDbStatus("error");
+        setDbStatusMsg("ساخت جدول با کلید Service Role ممکن نشد. لطفاً کوئری زیر را در SQL Editor اجرا کنید.");
+      } else {
+        setDbStatus("connected");
+        setDbStatusMsg("جدول ساخته شد و اتصال برقرار است!");
+        setShowCreateTable(false);
+      }
+    } catch (err) {
+      setDbStatus("error");
+      setDbStatusMsg("خطا در ساخت جدول: " + err.message);
+    }
+    setCreatingTable(false);
   };
 
   return (
@@ -400,6 +557,19 @@ export default function SmartSearchPage() {
                 </span>
                 5. نمایش نتایج
               </h2>
+              <div className="flex justify-end mb-2">
+                <button
+                  className="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 px-4 rounded-full shadow transition disabled:opacity-50"
+                  onClick={retryAllFailed}
+                  disabled={pagedResults.every((feature, idx) => {
+                    const globalIdx = (page - 1) * rowsPerPage + idx;
+                    const token = poiTokens[globalIdx] || null;
+                    return !token || !poiDetailErrors[token];
+                  })}
+                >
+                  فراخوانی مجدد همه آدرس‌های دریافت‌نشده
+                </button>
+              </div>
               <ResultMap polygon={polygon} results={results} cameraPointsWithStatus={cameraPointsWithStatus} />
               <div className="mt-4 overflow-x-auto">
                 <h3 className="font-semibold mb-2">جدول نتایج:</h3>
@@ -507,6 +677,142 @@ export default function SmartSearchPage() {
                 </div>
               </div>
             </section>
+          )}
+        </div>
+        {/* --- بخش تنظیمات دیتابیس --- */}
+        <div className="bg-white/90 dark:bg-gray-900/80 rounded-2xl shadow-xl p-6 sm:p-10 mb-8 border border-gray-200 dark:border-gray-700">
+          <h2 className="text-xl font-bold mb-4 text-indigo-700 dark:text-indigo-300 flex items-center gap-2">
+            <span className="inline-block bg-indigo-100 dark:bg-indigo-900 rounded-full p-1">
+              <svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm1 17.93V20a1 1 0 1 1-2 0v-.07A8.001 8.001 0 0 1 4.07 13H4a1 1 0 1 1 0-2h.07A8.001 8.001 0 0 1 11 4.07V4a1 1 0 1 1 2 0v.07A8.001 8.001 0 0 1 19.93 11H20a1 1 0 1 1 0 2h-.07A8.001 8.001 0 0 1 13 19.93Z"/></svg>
+            </span>
+            تنظیمات دیتابیس
+          </h2>
+          <div className="flex flex-wrap gap-4 items-center mb-4">
+            <label className="flex items-center gap-2">
+              نوع دیتابیس:
+              <select className="p-2 border rounded" value={dbType} onChange={e => setDbType(e.target.value)}>
+                <option value="sqlite">SQLite</option>
+                <option value="postgres">PostgreSQL</option>
+                <option value="mysql">MySQL</option>
+                <option value="supabase">Supabase</option>
+              </select>
+            </label>
+            {dbType === "supabase" && (
+              <>
+                <input
+                  type="text"
+                  className="p-2 border rounded min-w-[200px]"
+                  placeholder="Supabase URL"
+                  value={supabaseUrl}
+                  onChange={e => setSupabaseUrl(e.target.value)}
+                />
+                <input
+                  type="text"
+                  className="p-2 border rounded min-w-[200px]"
+                  placeholder="Supabase API Key"
+                  value={supabaseKey}
+                  onChange={e => setSupabaseKey(e.target.value)}
+                />
+                <button
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-full shadow transition"
+                  onClick={handleTestSupabaseConnection}
+                  disabled={dbStatus === "connecting"}
+                >
+                  {dbStatus === "connecting" ? "در حال اتصال..." : "تست اتصال"}
+                </button>
+              </>
+            )}
+            {dbType !== "supabase" && (
+              <input
+                type="text"
+                className="p-2 border rounded min-w-[200px]"
+                placeholder="Connection string یا مسیر فایل..."
+                value={dbConn}
+                onChange={e => setDbConn(e.target.value)}
+              />
+            )}
+            <button
+              className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-full shadow transition disabled:opacity-50"
+              onClick={handleTransferToDb}
+              disabled={dbLoading || dbStatus !== "connected"}
+            >
+              {dbLoading ? "در حال انتقال..." : "انتقال داده به دیتابیس"}
+            </button>
+            <button
+              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-full shadow transition"
+              onClick={() => setDbData([])}
+            >
+              پاک‌سازی نمایش داده‌های ذخیره‌شده
+            </button>
+            {showCreateTable && dbType === "supabase" && (
+              <div className="w-full bg-yellow-50 dark:bg-yellow-900 border border-yellow-300 dark:border-yellow-700 rounded p-4 mt-2">
+                <div className="mb-2 text-yellow-800 dark:text-yellow-200 font-bold">جدول poi_details در Supabase وجود ندارد.</div>
+                <div className="mb-2 text-sm">برای ساخت جدول، کوئری زیر را در SQL Editor اجرا کنید یا اگر Service Role Key دارید، آن را وارد و روی دکمه زیر کلیک کنید:</div>
+                <pre className="bg-gray-100 dark:bg-gray-800 p-2 rounded text-xs overflow-x-auto mb-2">{createTableSQL}</pre>
+                <input
+                  type="text"
+                  className="p-2 border rounded min-w-[200px] mb-2"
+                  placeholder="Supabase Service Role Key (اختیاری)"
+                  value={serviceRoleKey}
+                  onChange={e => setServiceRoleKey(e.target.value)}
+                />
+                <button
+                  className="bg-yellow-600 hover:bg-yellow-700 text-white font-semibold py-2 px-4 rounded-full shadow transition disabled:opacity-50"
+                  onClick={handleCreateTable}
+                  disabled={creatingTable || !serviceRoleKey}
+                >
+                  {creatingTable ? "در حال ساخت جدول..." : "ساخت جدول در Supabase"}
+                </button>
+              </div>
+            )}
+            {/* وضعیت اتصال */}
+            <span className={
+              dbStatus === "connected" ? "text-green-700 font-bold" :
+              dbStatus === "connecting" ? "text-blue-600" :
+              dbStatus === "error" ? "text-red-600 font-bold" : "text-gray-500"
+            }>
+              {dbStatusMsg}
+            </span>
+          </div>
+          {dbData.length > 0 && (
+            <div className="overflow-x-auto mt-2">
+              <h3 className="font-semibold mb-2">داده‌های ذخیره‌شده در دیتابیس (نمونه):</h3>
+              <div className="mb-2 text-sm text-green-700 dark:text-green-300">تعداد اطلاعات ذخیره‌شده: <b>{dbData.length}</b></div>
+              <table className="min-w-full border text-sm rounded-xl overflow-hidden shadow-xl">
+                <thead>
+                  <tr className="bg-indigo-100 dark:bg-indigo-800 text-indigo-900 dark:text-indigo-100">
+                    <th className="border px-2 py-1">poitoken</th>
+                    <th className="border px-2 py-1">نام</th>
+                    <th className="border px-2 py-1">آدرس</th>
+                    <th className="border px-2 py-1">امتیاز</th>
+                    <th className="border px-2 py-1">دسته‌بندی</th>
+                    <th className="border px-2 py-1">مختصات</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dbData.map((row, idx) => (
+                    <tr key={idx} className="odd:bg-white even:bg-indigo-50 dark:odd:bg-gray-900 dark:even:bg-indigo-900/40">
+                      <td className="border px-2 py-1 font-mono text-xs">{row.token}</td>
+                      <td className="border px-2 py-1">{row.name}</td>
+                      <td className="border px-2 py-1">{row.address}</td>
+                      <td className="border px-2 py-1">{row.rate}</td>
+                      <td className="border px-2 py-1">{row.category}</td>
+                      <td className="border px-2 py-1">{row.coords}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {dbTransferErrors.length > 0 && (
+            <div className="bg-red-50 dark:bg-red-900 border border-red-300 dark:border-red-700 rounded p-4 mt-2">
+              <div className="mb-2 text-red-800 dark:text-red-200 font-bold">برخی ردیف‌ها به دلیل نداشتن آدرس ارسال نشدند:</div>
+              <ul className="text-xs text-red-700 dark:text-red-300 list-disc pl-5">
+                {dbTransferErrors.map((row, idx) => (
+                  <li key={idx}>{row.token} - {row.name}</li>
+                ))}
+              </ul>
+            </div>
           )}
         </div>
       </div>
