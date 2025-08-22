@@ -4,7 +4,6 @@ import { MapContainer, TileLayer } from "react-leaflet";
 import { FeatureGroup } from "react-leaflet";
 import { EditControl } from "react-leaflet-draw";
 import "leaflet/dist/leaflet.css";
-import "leaflet-draw/dist/leaflet.draw.css";
 
 export default function MapWithDraw({ onPolygonChange }) {
   const [mounted, setMounted] = useState(false);
@@ -12,6 +11,11 @@ export default function MapWithDraw({ onPolygonChange }) {
 
   useEffect(() => {
     setMounted(true);
+    if (typeof window !== "undefined") {
+      import("leaflet-draw").then(() => {
+        import("leaflet-draw/dist/leaflet.draw.css");
+      });
+    }
   }, []);
   if (!mounted) return null;
 
