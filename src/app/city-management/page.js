@@ -14,9 +14,17 @@ export default function CityManagementPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filteredCities, setFilteredCities] = useState([]);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [isClient, setIsClient] = useState(false);
+
+  // Set client flag
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   // Load cities on component mount
   useEffect(() => {
+    if (!isClient) return;
+    
     // Try to load from localStorage first, then fallback to cities-data.js
     const savedCities = localStorage.getItem('iranCities');
     if (savedCities) {
@@ -33,7 +41,7 @@ export default function CityManagementPage() {
       setCityList(cities);
       setFilteredCities(cities);
     }
-  }, []);
+  }, [isClient]);
 
   // Filter cities based on search
   useEffect(() => {
@@ -102,8 +110,10 @@ export default function CityManagementPage() {
     const updatedCities = [...cityList, cityToAdd];
     setCityList(updatedCities);
     
-    // Save to localStorage
-    localStorage.setItem('iranCities', JSON.stringify(updatedCities));
+    // Save to localStorage (client-side only)
+    if (isClient) {
+      localStorage.setItem('iranCities', JSON.stringify(updatedCities));
+    }
     
     // Reset form
     setNewCity({
@@ -148,8 +158,10 @@ export default function CityManagementPage() {
 
     setCityList(updatedCities);
     
-    // Save to localStorage
-    localStorage.setItem('iranCities', JSON.stringify(updatedCities));
+    // Save to localStorage (client-side only)
+    if (isClient) {
+      localStorage.setItem('iranCities', JSON.stringify(updatedCities));
+    }
     
     // Reset form
     setNewCity({
@@ -169,8 +181,10 @@ export default function CityManagementPage() {
       const updatedCities = cityList.filter((_, i) => i !== index);
       setCityList(updatedCities);
       
-      // Save to localStorage
-      localStorage.setItem('iranCities', JSON.stringify(updatedCities));
+      // Save to localStorage (client-side only)
+      if (isClient) {
+        localStorage.setItem('iranCities', JSON.stringify(updatedCities));
+      }
       
       generateExportCode(updatedCities);
     }
@@ -202,7 +216,9 @@ ${cities.map(city => `  {"name_fa": "${city.name_fa}", "name_en": "${city.name_e
 
   const resetToOriginal = () => {
     if (confirm("آیا مطمئن هستید که می‌خواهید به لیست اصلی شهرها برگردید؟ تمام تغییرات از بین خواهد رفت.")) {
-      localStorage.removeItem('iranCities');
+      if (isClient) {
+        localStorage.removeItem('iranCities');
+      }
       setCityList(cities);
       setFilteredCities(cities);
       alert("لیست شهرها به حالت اصلی برگشت.");
@@ -211,7 +227,9 @@ ${cities.map(city => `  {"name_fa": "${city.name_fa}", "name_en": "${city.name_e
 
   const clearAllCities = () => {
     if (confirm("آیا مطمئن هستید که می‌خواهید تمام شهرها را حذف کنید؟")) {
-      localStorage.removeItem('iranCities');
+      if (isClient) {
+        localStorage.removeItem('iranCities');
+      }
       setCityList([]);
       setFilteredCities([]);
       alert("تمام شهرها حذف شدند.");
@@ -227,6 +245,24 @@ ${cities.map(city => `  {"name_fa": "${city.name_fa}", "name_en": "${city.name_e
     setEditingIndex(-1);
     setShowAddForm(false);
   };
+
+  // Show loading state during hydration
+  if (!isClient) {
+    return (
+      <main className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-0 sm:p-8">
+        <div className="max-w-6xl mx-auto py-8">
+          <div className="bg-white/90 dark:bg-gray-900/80 rounded-2xl shadow-xl p-6 sm:p-10 mb-8 border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-center h-64">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+                <p className="text-gray-600 dark:text-gray-300">در حال بارگذاری...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-0 sm:p-8">
