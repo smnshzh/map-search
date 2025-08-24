@@ -155,6 +155,15 @@ body {
   background-color: #DC2626;
 }
 
+/* Neighborhood clickable styles */
+.mapboxgl-canvas-container {
+  cursor: crosshair;
+}
+
+.mapboxgl-canvas-container:hover {
+  cursor: pointer;
+}
+
 /* City search specific styles */
 .city-card {
   transition: all 0.3s ease;

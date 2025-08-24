@@ -21,7 +21,7 @@ const Popup = dynamic(() => import("react-map-gl/mapbox").then(mod => mod.Popup)
 const Source = dynamic(() => import("react-map-gl/mapbox").then(mod => mod.Source), { ssr: false });
 const Layer = dynamic(() => import("react-map-gl/mapbox").then(mod => mod.Layer), { ssr: false });
 
-export default function MapboxMap({ selectedCity, selectedNeighborhood, onCitySelect }) {
+export default function MapboxMap({ selectedCity, selectedNeighborhood, onCitySelect, neighborhoods = [], onNeighborhoodSelect }) {
   const [viewState, setViewState] = useState({
     longitude: 54.6892,
     latitude: 32.4279,
@@ -29,6 +29,7 @@ export default function MapboxMap({ selectedCity, selectedNeighborhood, onCitySe
   });
   
   const [popupInfo, setPopupInfo] = useState(null);
+  const [neighborhoodPopupInfo, setNeighborhoodPopupInfo] = useState(null);
   const [mounted, setMounted] = useState(false);
 
   // Mapbox access token
@@ -56,6 +57,28 @@ export default function MapboxMap({ selectedCity, selectedNeighborhood, onCitySe
     }
   }, [selectedCity, selectedNeighborhood]);
 
+  const handleMapClick = (event) => {
+    if (!onNeighborhoodSelect || !neighborhoods.length) return;
+    
+    // Check if click is on a neighborhood
+    const features = event.features || [];
+    const neighborhoodFeature = features.find(f => 
+      f.source && f.source.startsWith('neighborhood-')
+    );
+    
+    if (neighborhoodFeature) {
+      const neighborhoodSlug = neighborhoodFeature.source.replace('neighborhood-', '');
+      const neighborhood = neighborhoods.find(n => 
+        (n.slug || n.slug === '') === neighborhoodSlug
+      );
+      
+      if (neighborhood) {
+        onNeighborhoodSelect(neighborhood);
+        setNeighborhoodPopupInfo(neighborhood);
+      }
+    }
+  };
+
   if (!mounted || typeof window === "undefined") {
     return (
       <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800">
@@ -72,6 +95,8 @@ export default function MapboxMap({ selectedCity, selectedNeighborhood, onCitySe
       <Map
         {...viewState}
         onMove={evt => setViewState(evt.viewState)}
+        onClick={handleMapClick}
+        interactiveLayerIds={neighborhoods.map(n => `neighborhood-fill-${n.slug || neighborhoods.indexOf(n)}`)}
         style={{ width: "100%", height: "100%" }}
         mapStyle="mapbox://styles/mapbox/streets-v12"
         mapboxAccessToken={MAPBOX_TOKEN}
@@ -101,38 +126,56 @@ export default function MapboxMap({ selectedCity, selectedNeighborhood, onCitySe
           </Marker>
         ))}
 
-        {/* Neighborhood boundary */}
-        {selectedNeighborhood && selectedNeighborhood.coordinates && (
-          <Source 
-            id="neighborhood-boundary" 
-            type="geojson" 
-            data={{
-              type: "Feature",
-              geometry: {
-                type: "Polygon",
-                coordinates: [selectedNeighborhood.coordinates]
-              }
-            }}
-          >
-            <Layer
-              id="neighborhood-fill"
-              type="fill"
-              paint={{
-                'fill-color': '#10B981',
-                'fill-opacity': 0.2
+        {/* All neighborhoods as polygons */}
+        {neighborhoods.map((neighborhood, index) => {
+          // Skip if no coordinates
+          if (!neighborhood.coordinates) return null;
+          
+          const isSelected = selectedNeighborhood && selectedNeighborhood.slug === neighborhood.slug;
+          const sourceId = `neighborhood-${neighborhood.slug || index}`;
+          
+          return (
+            <Source 
+              key={sourceId}
+              id={sourceId} 
+              type="geojson" 
+              data={{
+                type: "Feature",
+                geometry: {
+                  type: "Polygon",
+                  coordinates: [neighborhood.coordinates]
+                },
+                properties: {
+                  name: neighborhood.name,
+                  slug: neighborhood.slug
+                }
               }}
-            />
-            <Layer
-              id="neighborhood-outline"
-              type="line"
-              paint={{
-                'line-color': '#10B981',
-                'line-width': 3,
-                'line-dasharray': [2, 2]
-              }}
-            />
-          </Source>
-        )}
+            >
+              {/* Fill layer */}
+              <Layer
+                id={`neighborhood-fill-${neighborhood.slug || index}`}
+                type="fill"
+                paint={{
+                  'fill-color': isSelected ? '#10B981' : '#3B82F6',
+                  'fill-opacity': isSelected ? 0.4 : 0.2
+                }}
+                layout={{
+                  'visibility': 'visible'
+                }}
+              />
+              {/* Outline layer */}
+              <Layer
+                id={`neighborhood-outline-${neighborhood.slug || index}`}
+                type="line"
+                paint={{
+                  'line-color': isSelected ? '#10B981' : '#3B82F6',
+                  'line-width': isSelected ? 4 : 2,
+                  'line-dasharray': isSelected ? [0] : [2, 2]
+                }}
+              />
+            </Source>
+          );
+        })}
 
         {/* Popup for city info */}
         {popupInfo && (
@@ -151,6 +194,29 @@ export default function MapboxMap({ selectedCity, selectedNeighborhood, onCitySe
               <p className="text-xs text-gray-500 mt-1">
                 {popupInfo.coordinates[1].toFixed(4)}, {popupInfo.coordinates[0].toFixed(4)}
               </p>
+            </div>
+          </Popup>
+        )}
+
+        {/* Popup for neighborhood info */}
+        {neighborhoodPopupInfo && (
+          <Popup
+            anchor="top"
+            longitude={neighborhoodPopupInfo.centerPoint?.[0] || 0}
+            latitude={neighborhoodPopupInfo.centerPoint?.[1] || 0}
+            onClose={() => setNeighborhoodPopupInfo(null)}
+            closeButton={true}
+            closeOnClick={false}
+            className="neighborhood-popup"
+          >
+            <div className="p-2 text-center">
+              <h3 className="font-bold text-lg text-gray-800">{neighborhoodPopupInfo.name}</h3>
+              <p className="text-sm text-gray-600">محله</p>
+              {neighborhoodPopupInfo.centerPoint && (
+                <p className="text-xs text-gray-500 mt-1">
+                  {neighborhoodPopupInfo.centerPoint[1].toFixed(4)}, {neighborhoodPopupInfo.centerPoint[0].toFixed(4)}
+                </p>
+              )}
             </div>
           </Popup>
         )}

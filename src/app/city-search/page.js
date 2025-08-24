@@ -70,7 +70,28 @@ export default function CitySearchPage() {
           city: item.slug.city
         })) || [];
 
-      setNeighborhoods(cityNeighborhoods);
+      // Fetch detailed info for each neighborhood
+      const neighborhoodsWithDetails = [];
+      for (const neighborhood of cityNeighborhoods) {
+        try {
+          const response = await fetch(`https://search.raah.ir/v5/region-card/${neighborhood.city}/${neighborhood.slug}/`);
+          if (response.ok) {
+            const data = await response.json();
+            neighborhoodsWithDetails.push({
+              ...neighborhood,
+              fullData: data,
+              coordinates: data.geometry?.coordinates,
+              centerPoint: data.center_point
+            });
+          }
+        } catch (error) {
+          console.error(`Error fetching details for ${neighborhood.name}:`, error);
+          // Add neighborhood without coordinates
+          neighborhoodsWithDetails.push(neighborhood);
+        }
+      }
+
+      setNeighborhoods(neighborhoodsWithDetails);
       
       // Reset selected neighborhood when city changes
       setSelectedNeighborhood(null);
@@ -90,25 +111,8 @@ export default function CitySearchPage() {
     setShowCityList(false);
   };
 
-  const handleNeighborhoodSelect = async (neighborhood) => {
+  const handleNeighborhoodSelect = (neighborhood) => {
     setSelectedNeighborhood(neighborhood);
-    
-    // Fetch detailed neighborhood info including coordinates
-    try {
-      const response = await fetch(`https://search.raah.ir/v5/region-card/${neighborhood.city}/${neighborhood.slug}/`);
-      if (response.ok) {
-        const data = await response.json();
-        // Update neighborhood with full data
-        setSelectedNeighborhood({
-          ...neighborhood,
-          fullData: data,
-          coordinates: data.geometry?.coordinates,
-          centerPoint: data.center_point
-        });
-      }
-    } catch (error) {
-      console.error("Error fetching neighborhood details:", error);
-    }
   };
 
   const handleSearchChange = (e) => {
@@ -221,8 +225,8 @@ export default function CitySearchPage() {
             </div>
           )}
 
-          {/* Neighborhood Selection */}
-          {selectedCity && (
+          {/* Neighborhood Selection - Now handled by map */}
+          {selectedCity && neighborhoods.length > 0 && (
             <div className="bg-green-50 dark:bg-green-900/50 rounded-xl p-4 border border-green-200 dark:border-green-700">
               <h3 className="text-lg font-bold text-green-900 dark:text-green-100 mb-3 flex items-center gap-2">
                 <span className="inline-block bg-green-100 dark:bg-green-900 rounded-full p-1">
@@ -230,7 +234,7 @@ export default function CitySearchPage() {
                     <path fill="currentColor" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
                   </svg>
                 </span>
-                انتخاب محله
+                محله‌های شهر {selectedCity.name_fa}
               </h3>
               
               {loadingNeighborhoods ? (
@@ -240,33 +244,15 @@ export default function CitySearchPage() {
                 </div>
               ) : neighborhoodError ? (
                 <div className="text-red-600 dark:text-red-400 text-center py-2">{neighborhoodError}</div>
-              ) : neighborhoods.length > 0 ? (
+              ) : (
                 <div>
                   <p className="text-green-700 dark:text-green-300 mb-3">
-                    {neighborhoods.length} محله در شهر {selectedCity.name_fa} یافت شد:
+                    {neighborhoods.length} محله در شهر {selectedCity.name_fa} یافت شد.
                   </p>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-                    {neighborhoods.map((neighborhood, index) => (
-                      <div
-                        key={index}
-                        onClick={() => handleNeighborhoodSelect(neighborhood)}
-                        className={`p-3 rounded-lg border-2 cursor-pointer transition-all hover:shadow-md text-center ${
-                          selectedNeighborhood && selectedNeighborhood.slug === neighborhood.slug
-                            ? 'border-green-500 bg-green-100 dark:bg-green-800/50'
-                            : 'border-green-200 dark:border-green-700 hover:border-green-400 dark:hover:border-green-500'
-                        }`}
-                      >
-                        <div className="font-medium text-green-900 dark:text-green-100 text-sm">
-                          {neighborhood.name}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                  <p className="text-green-600 dark:text-green-400 text-sm">
+                    برای انتخاب محله، روی محدوده آن روی نقشه کلیک کنید.
+                  </p>
                 </div>
-              ) : (
-                <p className="text-green-600 dark:text-green-400 text-center py-2">
-                  محله‌ای برای این شهر یافت نشد.
-                </p>
               )}
             </div>
           )}
@@ -308,11 +294,16 @@ export default function CitySearchPage() {
             </span>
             نقشه شهرها و محله‌ها
           </h2>
-          <div className="h-[600px] w-full rounded-xl overflow-hidden border-2 border-indigo-200 dark:border-indigo-700 shadow">
+          <p className="text-gray-600 dark:text-gray-400 mb-4">
+            برای انتخاب محله، روی محدوده آن روی نقشه کلیک کنید. محله انتخاب شده با رنگ سبز پررنگ نمایش داده می‌شود.
+          </p>
+          <div className="h-[600px] w-full rounded-xl overflow-hidden border-2 border-indigo-200 dark:border-gray-700 shadow">
             <MapboxMap 
               selectedCity={selectedCity} 
               selectedNeighborhood={selectedNeighborhood}
+              neighborhoods={neighborhoods}
               onCitySelect={handleCitySelect} 
+              onNeighborhoodSelect={handleNeighborhoodSelect}
             />
           </div>
         </div>
