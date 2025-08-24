@@ -17,8 +17,22 @@ export default function CityManagementPage() {
 
   // Load cities on component mount
   useEffect(() => {
-    setCityList(cities);
-    setFilteredCities(cities);
+    // Try to load from localStorage first, then fallback to cities-data.js
+    const savedCities = localStorage.getItem('iranCities');
+    if (savedCities) {
+      try {
+        const parsedCities = JSON.parse(savedCities);
+        setCityList(parsedCities);
+        setFilteredCities(parsedCities);
+      } catch (error) {
+        console.error('Error parsing saved cities:', error);
+        setCityList(cities);
+        setFilteredCities(cities);
+      }
+    } else {
+      setCityList(cities);
+      setFilteredCities(cities);
+    }
   }, []);
 
   // Filter cities based on search
@@ -88,6 +102,9 @@ export default function CityManagementPage() {
     const updatedCities = [...cityList, cityToAdd];
     setCityList(updatedCities);
     
+    // Save to localStorage
+    localStorage.setItem('iranCities', JSON.stringify(updatedCities));
+    
     // Reset form
     setNewCity({
       name_fa: "",
@@ -131,6 +148,9 @@ export default function CityManagementPage() {
 
     setCityList(updatedCities);
     
+    // Save to localStorage
+    localStorage.setItem('iranCities', JSON.stringify(updatedCities));
+    
     // Reset form
     setNewCity({
       name_fa: "",
@@ -148,6 +168,10 @@ export default function CityManagementPage() {
     if (confirm("آیا مطمئن هستید که می‌خواهید این شهر را حذف کنید؟")) {
       const updatedCities = cityList.filter((_, i) => i !== index);
       setCityList(updatedCities);
+      
+      // Save to localStorage
+      localStorage.setItem('iranCities', JSON.stringify(updatedCities));
+      
       generateExportCode(updatedCities);
     }
   };
@@ -167,10 +191,31 @@ ${cities.map(city => `  {"name_fa": "${city.name_fa}", "name_en": "${city.name_e
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+
+    // Show success message
+    alert(`فایل cities-data.js با ${cities.length} شهر دانلود شد. لطفاً این فایل را جایگزین فایل src/app/cities-data.js کنید.`);
   };
 
   const exportCities = () => {
     generateExportCode(cityList);
+  };
+
+  const resetToOriginal = () => {
+    if (confirm("آیا مطمئن هستید که می‌خواهید به لیست اصلی شهرها برگردید؟ تمام تغییرات از بین خواهد رفت.")) {
+      localStorage.removeItem('iranCities');
+      setCityList(cities);
+      setFilteredCities(cities);
+      alert("لیست شهرها به حالت اصلی برگشت.");
+    }
+  };
+
+  const clearAllCities = () => {
+    if (confirm("آیا مطمئن هستید که می‌خواهید تمام شهرها را حذف کنید؟")) {
+      localStorage.removeItem('iranCities');
+      setCityList([]);
+      setFilteredCities([]);
+      alert("تمام شهرها حذف شدند.");
+    }
   };
 
   const cancelEdit = () => {
@@ -247,6 +292,24 @@ ${cities.map(city => `  {"name_fa": "${city.name_fa}", "name_en": "${city.name_e
                 <path fill="currentColor" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 1v5h5v10H6V3h7z"/>
               </svg>
               دانلود فایل cities-data.js
+            </button>
+            <button
+              onClick={resetToOriginal}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white font-semibold rounded-lg shadow transition-colors"
+            >
+              <svg width="16" height="16" fill="none" viewBox="0 0 24 24">
+                <path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+              </svg>
+              بازگشت به لیست اصلی
+            </button>
+            <button
+              onClick={clearAllCities}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg shadow transition-colors"
+            >
+              <svg width="16" height="16" fill="none" viewBox="0 0 24 24">
+                <path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+              </svg>
+              حذف تمام شهرها
             </button>
           </div>
 
@@ -385,6 +448,11 @@ ${cities.map(city => `  {"name_fa": "${city.name_fa}", "name_en": "${city.name_e
                 نتایج جستجو: <span className="font-semibold text-indigo-600 dark:text-indigo-400">{filteredCities.length}</span> شهر
               </p>
             )}
+            <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-700">
+              <p className="text-sm text-blue-700 dark:text-blue-300">
+                💾 <strong>نکته:</strong> تغییرات در مرورگر شما ذخیره می‌شوند. برای ذخیره دائمی، فایل cities-data.js را دانلود کرده و جایگزین کنید.
+              </p>
+            </div>
           </div>
         </div>
       </div>
