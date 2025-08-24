@@ -1,3 +1,11 @@
+/* Leaflet CSS imports for better compatibility - must be at top */
+@import url('https://unpkg.com/leaflet@1.9.4/dist/leaflet.css');
+@import url('https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css');
+
+/* Mapbox CSS imports */
+@import url('https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css');
+@import url('https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.4.6/mapbox-gl-draw.css');
+
 @import "tailwindcss";
 
 :root {
@@ -23,4 +31,160 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Custom map styles */
+.map-container {
+  height: 100%;
+  width: 100%;
+  position: relative;
+}
+
+.leaflet-container {
+  height: 100%;
+  width: 100%;
+  font-family: inherit;
+}
+
+/* Performance optimizations */
+.leaflet-tile {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+}
+
+.leaflet-marker-icon {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+}
+
+/* Loading spinner styles */
+.loading-spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Map performance improvements */
+.leaflet-control-zoom {
+  border: 2px solid rgba(0,0,0,0.2);
+  background: white;
+}
+
+.leaflet-control-zoom a {
+  background: white;
+  border-bottom: 1px solid #ccc;
+  color: black;
+  font-weight: bold;
+}
+
+.leaflet-control-zoom a:hover {
+  background: #f4f4f4;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .leaflet-control-zoom {
+    background: #333;
+    border-color: rgba(255,255,255,0.2);
+  }
+  
+  .leaflet-control-zoom a {
+    background: #333;
+    color: white;
+    border-bottom-color: #555;
+  }
+  
+  .leaflet-control-zoom a:hover {
+    background: #444;
+  }
+}
+
+/* Mapbox custom styles */
+.mapboxgl-popup-content {
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  border: none;
+  padding: 0;
+}
+
+.city-popup .mapboxgl-popup-content {
+  background: white;
+  color: #333;
+}
+
+.result-popup .mapboxgl-popup-content {
+  background: white;
+  color: #333;
+}
+
+.mapboxgl-popup-close-button {
+  color: #666;
+  font-size: 18px;
+  padding: 8px;
+}
+
+.mapboxgl-popup-close-button:hover {
+  color: #333;
+  background: #f5f5f5;
+  border-radius: 50%;
+}
+
+/* Mapbox Draw custom styles */
+.mapboxgl-draw-polygon {
+  background-color: #3B82F6;
+  border-color: #2563EB;
+}
+
+.mapboxgl-draw-polygon:hover {
+  background-color: #2563EB;
+}
+
+.mapboxgl-draw-trash {
+  background-color: #EF4444;
+  border-color: #DC2626;
+}
+
+.mapboxgl-draw-trash:hover {
+  background-color: #DC2626;
+}
+
+/* City search specific styles */
+.city-card {
+  transition: all 0.3s ease;
+}
+
+.city-card:hover {
+  transform: translateY(-2px);
+}
+
+.city-dropdown {
+  max-height: 300px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e0 #f7fafc;
+}
+
+.city-dropdown::-webkit-scrollbar {
+  width: 6px;
+}
+
+.city-dropdown::-webkit-scrollbar-track {
+  background: #f7fafc;
+  border-radius: 3px;
+}
+
+.city-dropdown::-webkit-scrollbar-thumb {
+  background: #cbd5e0;
+  border-radius: 3px;
+}
+
+.city-dropdown::-webkit-scrollbar-thumb:hover {
+  background: #a0aec0;
 }

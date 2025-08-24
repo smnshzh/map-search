@@ -1,0 +1,2 @@
+# This file ensures that Cloudflare Pages serves static files correctly
+# and doesn't try to process them as Jekyll files

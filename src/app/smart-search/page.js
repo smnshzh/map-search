@@ -52,8 +52,30 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-const MapWithDraw = dynamic(() => import("./MapWithDraw"), { ssr: false });
-const ResultMap = dynamic(() => import("./ResultMap"), { ssr: false });
+// Dynamic imports with better Cloudflare compatibility
+const MapWithDraw = dynamic(() => import("./MapWithDraw"), { 
+  ssr: false,
+  loading: () => (
+    <div className="h-[400px] w-full rounded-xl overflow-hidden border-2 border-indigo-200 dark:border-indigo-700 shadow mb-2 flex items-center justify-center bg-gray-100 dark:bg-gray-800">
+      <div className="text-center">
+        <div className="animate-spin inline-block w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mb-2"></div>
+        <p className="text-gray-600 dark:text-gray-300">در حال بارگذاری نقشه...</p>
+      </div>
+    </div>
+  )
+});
+
+const ResultMap = dynamic(() => import("./ResultMap"), { 
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-[400px] rounded overflow-hidden border mb-4 flex items-center justify-center bg-gray-100 dark:bg-gray-800">
+      <div className="text-center">
+        <div className="animate-spin inline-block w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mb-2"></div>
+        <p className="text-gray-600 dark:text-gray-300">در حال بارگذاری نقشه نتایج...</p>
+      </div>
+    </div>
+  )
+});
 
 export default function SmartSearchPage() {
   const [categories, setCategories] = useState([]);
@@ -156,7 +178,7 @@ export default function SmartSearchPage() {
       try {
         const params = new URLSearchParams({
           slug: selected,
-          zoom: "14",
+          zoom: "20",
           camera: `${lng},${lat}`,
         });
         const res = await fetch(`${SEARCH_URL}?${params.toString()}`);
@@ -489,12 +511,12 @@ export default function SmartSearchPage() {
         <div className="bg-white/90 dark:bg-gray-900/80 rounded-2xl shadow-xl p-6 sm:p-10 mb-8 border border-gray-200 dark:border-gray-700">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
             <div>
-              <h1 className="text-3xl font-extrabold text-indigo-700 dark:text-indigo-300 mb-2 flex items-center gap-2">
-                <span className="inline-block bg-indigo-100 dark:bg-indigo-900 rounded-full p-2">
-                  <svg width="32" height="32" fill="none" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm1 17.93V20a1 1 0 1 1-2 0v-.07A8.001 8.001 0 0 1 4.07 13H4a1 1 0 1 1 0-2h.07A8.001 8.001 0 0 1 11 4.07V4a1 1 0 1 1 2 0v.07A8.001 8.001 0 0 1 19.93 11H20a1 1 0 1 1 0 2h-.07A8.001 8.001 0 0 1 13 19.93Z"/></svg>
-                </span>
-                جستجوی هوشمند راه (Raah)
-              </h1>
+                             <h1 className="text-3xl font-extrabold text-indigo-700 dark:text-indigo-300 mb-2 flex items-center gap-2">
+                 <span className="inline-block bg-indigo-100 dark:bg-indigo-900 rounded-full p-2">
+                   <img src="/iran-map-logo-small.svg" alt="لوگوی نقشه ایران" className="w-8 h-8" />
+                 </span>
+                 جستجوی هوشمند راه (Raah)
+               </h1>
               <p className="text-gray-600 dark:text-gray-300 text-base max-w-xl">
                 با انتخاب دسته‌بندی و محدوده جغرافیایی، نقاط مورد نظر خود را روی نقشه جستجو و اطلاعات کامل آن‌ها را مشاهده کنید.
               </p>
@@ -789,7 +811,7 @@ export default function SmartSearchPage() {
                 type="text"
                 className="p-2 border rounded min-w-[200px]"
                 placeholder="Connection string یا مسیر فایل..."
-                value={dbConn}
+                value={dbConn}      
                 onChange={e => setDbConn(e.target.value)}
               />
             )}
