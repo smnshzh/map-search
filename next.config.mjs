@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // output: 'export', // Enable for Cloudflare Pages deployment (disabled for dev API routes)
+  output: 'export', // Enable for Cloudflare Pages deployment
   trailingSlash: true,
   images: {
     unoptimized: true,

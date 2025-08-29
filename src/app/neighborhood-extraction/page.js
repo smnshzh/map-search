@@ -140,10 +140,7 @@ export default function NeighborhoodExtraction() {
   const getNeighborhoodData = async (lon, lat) => {
     let requestUrl = `https://reverse-geocoding.raah.ir/v1/features?result_type=neighborhood&location=${lon},${lat}`;
     try {
-      // Use internal proxy to bypass CORS
-      const proxyUrl = `/api/raah-reverse?result_type=neighborhood&lon=${encodeURIComponent(lon)}&lat=${encodeURIComponent(lat)}`;
-
-      const res = await fetch(proxyUrl);
+      const res = await fetch(requestUrl, { headers: { 'Accept': 'application/json' } });
       
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
       const data = await res.json();

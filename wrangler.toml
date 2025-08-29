@@ -8,3 +8,6 @@ pages_build_output_dir = "./out"
 # Environment variables (if needed)
 [vars]
 ENVIRONMENT = "production"
+
+[assets]
+directory = "./dist"
