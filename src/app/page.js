@@ -267,6 +267,30 @@ export default function Home() {
                 </div>
               </div>
             </Link>
+
+            <Link href="/neighborhood-extraction" className="group">
+              <div className="bg-gradient-to-br from-teal-500 to-cyan-600 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center">
+                    <svg width="32" height="32" fill="none" viewBox="0 0 24 24">
+                      <path fill="currentColor" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold mb-2">استخراج محلات</h3>
+                    <p className="text-teal-100">
+                      استخراج محلات از شهرها با API
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-4 flex items-center text-teal-100 group-hover:text-white transition-colors">
+                  <span>شروع کنید</span>
+                  <svg width="20" height="20" fill="none" viewBox="0 0 24 24" className="mr-2 transform group-hover:translate-x-1 transition-transform">
+                    <path fill="currentColor" d="M10 17l5-5-5-5v10z"/>
+                  </svg>
+                </div>
+              </div>
+            </Link>
           </div>
 
           <div className="mt-8 text-center">

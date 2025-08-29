@@ -1,23 +1,6 @@
-# راهنمای استقرار در Cloudflare Pages
+# Cloudflare Pages Deployment
 
-## مشکلات سازگاری حل شده
-
-### 1. مشکلات Leaflet و نقشه
-- **مشکل**: CSS imports در کامپوننت‌های client-side
-- **راه حل**: استفاده از dynamic imports و loading states
-- **نتیجه**: نقشه‌ها در Cloudflare به درستی کار می‌کنند
-
-### 2. مشکلات SSR/CSR
-- **مشکل**: تداخل server-side و client-side rendering
-- **راه حل**: استفاده از `ssr: false` برای کامپوننت‌های نقشه
-- **نتیجه**: عدم خطا در Cloudflare Pages
-
-### 3. پیکربندی Next.js
-- **مشکل**: تنظیمات پیش‌فرض برای static export
-- **راه حل**: اضافه کردن `output: 'export'` و `trailingSlash: true`
-- **نتیجه**: تولید فایل‌های static سازگار با Cloudflare
-
-## مراحل استقرار
+## 🚀 مراحل استقرار در Cloudflare Pages
 
 ### 1. نصب Wrangler CLI
 ```bash
@@ -36,55 +19,46 @@ npm run build:cloudflare
 
 ### 4. استقرار
 ```bash
-wrangler pages deploy out
+npm run deploy:cloudflare
 ```
 
-## تنظیمات Cloudflare Pages
+## 📁 ساختار فایل‌ها
 
-### متغیرهای محیطی
-- `NODE_ENV`: `production`
-- `NEXT_PUBLIC_SUPABASE_URL`: URL دیتابیس Supabase
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`: کلید عمومی Supabase
+- `functions/neighborhood.js` - Cloudflare Function برای API
+- `out/` - فایل‌های static export
+- `wrangler.toml` - تنظیمات Cloudflare Workers
 
-### تنظیمات Build
-- **Build command**: `npm run build:cloudflare`
-- **Build output directory**: `out`
-- **Node.js version**: 18 یا بالاتر
+## 🔧 نکات مهم
 
-## نکات مهم
+1. **Development Mode**: از Next.js API routes استفاده می‌کنیم (`/api/neighborhood`)
+2. **Production Mode**: از Cloudflare Functions استفاده می‌کنیم (`/functions/neighborhood`)
+3. **Static Export**: برای Cloudflare، `output: 'export'` را در `next.config.mjs` فعال کنید
+4. **CORS**: CORS headers در Cloudflare Function تنظیم شده
 
-### 1. محدودیت‌های Cloudflare
-- **Server-side API routes**: پشتیبانی نمی‌شوند
-- **Database connections**: فقط از طریق client-side
-- **File system access**: محدود
+## 🔄 تغییرات برای Cloudflare
 
-### 2. بهینه‌سازی
-- **Image optimization**: غیرفعال شده
-- **Static generation**: فعال
-- **Bundle splitting**: بهینه شده
-
-### 3. عیب‌یابی
-- **Console errors**: بررسی در browser console
-- **Network requests**: بررسی در Network tab
-- **Build logs**: بررسی در Cloudflare dashboard
-
-## تست محلی
-
-### 1. تست static export
-```bash
-npm run build:cloudflare
-npx serve out
+### 1. فعال کردن static export
+```javascript
+// next.config.mjs
+output: 'export', // Uncomment for Cloudflare
 ```
 
-### 2. تست با Wrangler
-```bash
-wrangler pages dev out
+### 2. تغییر API URL
+```javascript
+// در صفحه neighborhood-extraction
+const url = `/functions/neighborhood?lon=${lon}&lat=${lat}`;
 ```
 
-## پشتیبانی
+## 🌐 URL نهایی
 
-در صورت بروز مشکل:
-1. بررسی console errors
-2. بررسی build logs
-3. تست محلی
-4. بررسی compatibility flags
+پس از استقرار، URL به شکل زیر خواهد بود:
+```
+https://map-nextjs.pages.dev
+```
+
+## 🐛 عیب‌یابی
+
+اگر با خطا مواجه شدید:
+1. `wrangler.toml` را بررسی کنید
+2. Cloudflare Function را تست کنید
+3. Console browser را بررسی کنید

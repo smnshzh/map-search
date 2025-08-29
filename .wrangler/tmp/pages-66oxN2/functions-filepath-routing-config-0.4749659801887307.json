@@ -1,0 +1,21 @@
+{
+  "routes": [
+    {
+      "routePath": "/_worker",
+      "mountPath": "/",
+      "method": "",
+      "module": [
+        "_worker.js:onRequest"
+      ]
+    },
+    {
+      "routePath": "/neighborhood",
+      "mountPath": "/",
+      "method": "",
+      "module": [
+        "neighborhood.js:onRequest"
+      ]
+    }
+  ],
+  "baseURL": "/"
+}
